@@ -1,10 +1,12 @@
 // import logo from './logo.svg';
 import './App.css';
-import HomePage from './Component/HomeComponent';
+// import HomePage from './Component/HomeComponent';
+import AquaGoal from './Component/AquaGoal';
 function App() {
   return (
     <div className='App'>
-      <HomePage></HomePage>
+      {/* <HomePage></HomePage> */}
+      <AquaGoal></AquaGoal>
     </div> 
   )
 }
