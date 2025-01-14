@@ -1,34 +1,86 @@
 import { Field, Form, Formik, ErrorMessage } from "formik";
 import { useState } from "react";
 import * as Yup from "yup";
+import moment from "moment"; // For time formatting
+import { SetDailyIntakeApi, fetchDailyIntakeApi } from "./API/SetDailyIntake"; // API functions
 
+// Validation schema
+const validationSchema = Yup.object({
+  glasses: Yup.number()
+    .required("Please enter a valid number of glasses!")
+    .min(5, "Too low! Aim for at least 5 glasses.")
+    .max(20, "Too high! Keep it below 20 glasses."),
+  from: Yup.string().required("Start time is required"),
+  fromAmPm: Yup.string().required("Please select AM/PM for the start time"),
+  to: Yup.string().required("End time is required"),
+  toAmPm: Yup.string().required("Please select AM/PM for the end time"),
+  option: Yup.string().required("Please select a reminder interval"),
+});
+
+// Helper Functions
+const formatTime = (time, amPm) =>
+  moment(`${time} ${amPm}`, "hh:mm A").format("HH:mm");
+
+const preparePayload = (values) => ({
+  noOfGlasses: values.glasses,
+  start: formatTime(values.from, values.fromAmPm),
+  end: formatTime(values.to, values.toAmPm),
+  interval:
+    values.option === "30 minutes" ? 30 : values.option === "1 hour" ? 60 : 120,
+});
+
+// Reusable Components
+const TimeInput = ({ name, label }) => (
+  <div className="d-flex align-items-center">
+    <Field type="time" name={name} className="form-control my-2 me-2" />
+    <Field as="select" name={`${name}AmPm`} className="form-select my-2">
+      <option value="AM">AM</option>
+      <option value="PM">PM</option>
+    </Field>
+    <ErrorMessage name={name} component="div" className="text-danger" />
+    <ErrorMessage name={`${name}AmPm`} component="div" className="text-danger" />
+  </div>
+);
+
+const RadioGroup = ({ name, options }) => (
+  <div>
+    {options.map((option) => (
+      <label key={option} className="d-block">
+        <Field type="radio" name={name} value={option} />
+        {option}
+      </label>
+    ))}
+    <ErrorMessage name={name} component="div" className="text-danger" />
+  </div>
+);
+
+// Main Component
 export default function SetIntake({ onGoalSet }) {
-  const [glasses, setGlasses] = useState(0);
+  const [apiResponse, setApiResponse] = useState(null);
+  const [dailyGoal, setDailyGoal] = useState(null);
 
-  // Validation schema
-  const validationSchema = Yup.object({
-    glasses: Yup.number()
-      .required("Please enter a valid number of glasses!")
-      .min(5, "Too low! Aim for at least 5 glasses.")
-      .max(20, "Too high! Keep it below 20 glasses."),
-    from: Yup.string().required("Start time is required"),
-    fromAmPm: Yup.string().required("Please select AM/PM for the start time"),
-    to: Yup.string().required("End time is required"),
-    toAmPm: Yup.string().required("Please select AM/PM for the end time"),
-    option: Yup.string().required("Please select a reminder interval"),
-  });
+  // API Call Handlers
+  async function handleSetGoal(values) {
+    try {
+      const payload = preparePayload(values);
+      const response = await SetDailyIntakeApi(payload);
+      console.log("API Response:", response.data);
+      setApiResponse("Your daily intake goal has been successfully set!");
+      if (onGoalSet) onGoalSet(payload);
+    } catch (error) {
+      console.error("Error:", error);
+      setApiResponse("Failed to set daily intake goal. Please try again.");
+    }
+  }
 
-  // Handle form submission
-  function handleSetGoal(values) {
-    setGlasses(values.glasses);
-
-    // Combine time and AM/PM into a single string for display or storage
-    const formattedFromTime = `${values.from} ${values.fromAmPm}`;
-    const formattedToTime = `${values.to} ${values.toAmPm}`;
-
-    console.log("Water intake goal set to:", values.glasses);
-    console.log("Reminder from:", formattedFromTime, "to:", formattedToTime);
-    if (onGoalSet) onGoalSet({ ...values, from: formattedFromTime, to: formattedToTime });
+  async function checkGoal() {
+    try {
+      const response = await fetchDailyIntakeApi();
+      console.log("API Response:", response.data);
+      setDailyGoal(response.data);
+    } catch (error) {
+      console.error("Error fetching goal:", error);
+    }
   }
 
   return (
@@ -46,7 +98,7 @@ export default function SetIntake({ onGoalSet }) {
         validationSchema={validationSchema}
         onSubmit={handleSetGoal}
       >
-        {({ values }) => (
+        {() => (
           <Form>
             {/* Water Intake Input */}
             <div className="form-group my-3">
@@ -59,92 +111,69 @@ export default function SetIntake({ onGoalSet }) {
                 placeholder="10"
                 className="form-control"
               />
-              <ErrorMessage
-                name="glasses"
-                component="div"
-                className="text-danger"
-              />
+              <ErrorMessage name="glasses" component="div" className="text-danger" />
             </div>
 
             {/* Reminder Time Input */}
-            <div>
-              <label htmlFor="reminder" className="form-label">
-                Set Reminder
-              </label>
+            <label className="form-label">Set Reminder</label>
+            <TimeInput name="from" label="Start Time" />
+            <TimeInput name="to" label="End Time" />
 
-              {/* From Time Input */}
-              <div className="d-flex align-items-center">
-                <Field
-                  type="time"
-                  name="from"
-                  className="form-control my-2 me-2"
-                  placeholder="Start Time"
-                />
-                <Field as="select" name="fromAmPm" className="form-select my-2">
-                  <option value="AM">AM</option>
-                  <option value="PM">PM</option>
-                </Field>
-              </div>
-              <ErrorMessage name="from" component="div" className="text-danger" />
-              <ErrorMessage name="fromAmPm" component="div" className="text-danger" />
+            {/* Reminder Interval */}
+            <label className="form-label">Select Reminder Interval</label>
+            <RadioGroup
+              name="option"
+              options={["30 minutes", "1 hour", "2 hours"]}
+            />
 
-              {/* To Time Input */}
-              <div className="d-flex align-items-center">
-                <Field
-                  type="time"
-                  name="to"
-                  className="form-control my-2 me-2"
-                  placeholder="End Time"
-                />
-                <Field as="select" name="toAmPm" className="form-select my-2">
-                  <option value="AM">AM</option>
-                  <option value="PM">PM</option>
-                </Field>
-              </div>
-              <ErrorMessage name="to" component="div" className="text-danger" />
-              <ErrorMessage name="toAmPm" component="div" className="text-danger" />
-            </div>
-
-            {/* Reminder Interval (Radio Buttons) */}
-            <div>
-              <label>Select Reminder Interval</label>
-              <div>
-                <label>
-                  <Field type="radio" name="option" value="30 minutes" />
-                  Every 30 minutes
-                </label>
-              </div>
-              <div>
-                <label>
-                  <Field type="radio" name="option" value="1 hour" />
-                  Every 1 hour
-                </label>
-              </div>
-              <div>
-                <label>
-                  <Field type="radio" name="option" value="2 hours" />
-                  Every 2 hours
-                </label>
-              </div>
-              <ErrorMessage
-                name="option"
-                component="div"
-                style={{ color: "red" }}
-              />
-            </div>
-
-            {/* Submit Button */}
-            <button type="submit" className="btn btn-primary mt-3">
+            {/* Buttons */}
+            <button type="submit" className="btn btn-primary m-3">
               Set Goal
+            </button>
+            <button
+              className="btn btn-secondary m-3"
+              type="button"
+              onClick={checkGoal}
+            >
+              Check Goal
             </button>
           </Form>
         )}
       </Formik>
 
-      {/* Success Message */}
-      {glasses > 0 && (
-        <div className="alert alert-success mt-4">
-          Your daily water intake goal is set to {glasses} glasses.
+      {/* Success/Failure Message */}
+      {apiResponse && (
+        <div
+          className={`alert mt-4 ${
+            apiResponse.includes("successfully") ? "alert-success" : "alert-danger"
+          }`}
+        >
+          {apiResponse}
+        </div>
+      )}
+
+      {/* Display Fetched Goal */}
+      {dailyGoal && (
+        <div className="mt-4">
+          <h3>Your Daily Goal</h3>
+          <table className="table table-bordered">
+            <thead>
+              <tr>
+                <th>Glasses</th>
+                <th>Start</th>
+                <th>End</th>
+                <th>Interval</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>{dailyGoal.noOfGlasses}</td>
+                <td>{dailyGoal.formattedStart}</td>
+                <td>{dailyGoal.formattedEnd}</td>
+                <td>{dailyGoal.interval} minutes</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       )}
     </div>
