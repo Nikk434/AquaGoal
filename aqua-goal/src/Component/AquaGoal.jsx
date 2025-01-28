@@ -12,7 +12,7 @@ export default function AquaGoal() {
             <Routes>
                 <Route path="/Home" element={<HomePage />} />
                 <Route path='/register' element={<Register/>}/>
-                <Route path="/authenticate" element={<Login/>}/>
+                <Route path="/login" element={<Login/>}/>
                 <Route path="/TrackDaily" element={<TrackDaily />} />
                 <Route path="/CreateChallenge" element={<CreateChallenge />} />
             </Routes>
